@@ -1,0 +1,9 @@
+{
+    "auto_toggle": false,
+    "python_executable": {
+        "linux": "python",
+        "osx": "python",
+        "windows": "python"
+    }
+    // "debug": true
+}

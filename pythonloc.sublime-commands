@@ -1,0 +1,31 @@
+[
+    {
+        "caption": "Pythonloc: Enable",
+        "command": "enable_pythonloc"
+    },
+    {
+        "caption": "Pythonloc: Disable",
+        "command": "disable_pythonloc"
+    },
+    {
+        "caption": "Pythonloc: Install",
+        "command": "piploc_install"
+    },
+    {
+        "caption": "Pythonloc: Upgrade",
+        "command": "piploc_install",
+        "args": {"upgrade": true}
+    },
+    {
+        "caption": "Pythonloc: List",
+        "command": "piploc_list"
+    },
+    {
+        "caption": "Pythonloc: Uninstall",
+        "command": "piploc_uninstall"
+    },
+    {
+        "caption": "Pythonloc: Freeze",
+        "command": "piploc_freeze"
+    }
+]
