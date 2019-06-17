@@ -26,18 +26,7 @@ def debug_log(msg):
         if not msg == "":
             log("[DEBUG] {}".format(msg))
 
-class PyPackagesError(Exception):
-    pass
-
-class PypackagesCommand(sublime_plugin.WindowCommand):
-    pass
-
-class PypackagesProjectCommand(PypackagesCommand):
-    def is_enabled(self):
-        return bool(_get_project_path() and os.getenv("PYPACKAGES"))
-
-
-def _execute(cmd, env=None, cwd=None):
+def execute(cmd, env=None, cwd=None):
     stdout, stderr = subprocess.Popen(
         cmd,
         env=env,
@@ -52,15 +41,15 @@ def _execute(cmd, env=None, cwd=None):
 
     return stdout, stderr
 
-def _pip(args, env=None):
-    python = _get_python_executable()
+def pip(args, env=None, cwd=None):
+    python = python_executable()
     pip_cmd = [python, "-m", "pip"] + args
 
     debug_log(pip_cmd)
-    stdout, stderr = _execute(
+    stdout, stderr = execute(
         pip_cmd,
         env=env,
-        cwd=_get_project_path(),
+        cwd=cwd,
     )
     if stderr:
         log("[Pypackages] Command \"{}\" failed".format(" ".join(pip_cmd)))
@@ -68,7 +57,7 @@ def _pip(args, env=None):
 
     return stdout, stderr
 
-def _pkg_list(packages_path):
+def pkg_list(packages_path):
     pkg_path = pkg_resources.Environment([packages_path])
 
     packages = []
@@ -81,34 +70,30 @@ def _pkg_list(packages_path):
 
     return packages
 
-
-# TODO: Include into `sublime.WindowCommand` class
-def _get_python_executable():
+def python_executable():
     settings = sublime.load_settings("pypackages.sublime-settings")
     return settings.get("python_executable").get(sublime.platform())
 
-# TODO: Include into `sublime.WindowCommand` class
-def _get_python_executable_path():
-    python_executable = _get_python_executable()
-    path = shutil.which(python_executable)
-    return os.path.dirname(path if path else python_executable)
+def python_executable_path():
+    python = python_executable()
+    path = shutil.which(python)
+    return os.path.dirname(path if path else python)
 
-# TODO: Include into `sublime.WindowCommand` class
-def _get_project_path():
-    return sublime.active_window().extract_variables().get("project_path", ".")
+def project_path(window=None):
+    if not window:
+        window = sublime.active_window()
+    return window.extract_variables().get("project_path", ".")
 
-# TODO: Include into `sublime.WindowCommand` class
-def _get_pypackages_path():
+def pypackages_path(window=None):
     """Return local __pypackages__ path relative to the script being run
 
     See https://www.python.org/dev/peps/pep-0582/
     """
-    window = sublime.active_window()
-    view = window.active_view()
+    if not window:
+        window = sublime.active_window()
 
-    debug_log(view.settings().has("pypackages_root"))
-    pypackages_root = view.settings().get(
-        "pypackages_root", _get_project_path()
+    pypackages_root = window.active_view().settings().get(
+        "pypackages_root", project_path(window)
     )
     pypackages_root = sublime.expand_variables(
         pypackages_root, window.extract_variables()
@@ -118,44 +103,65 @@ def _get_pypackages_path():
 
     return os.path.join(pypackages_root, "__pypackages__")
 
-# TODO: Include into `sublime.WindowCommand` class
-def _get_pypackages_lib_path():
-    pypackages_path = _get_pypackages_path()
+def pypackages_lib_path(window=None):
+    if not window:
+        window = sublime.active_window()
 
-    stdout, stderr = _execute(
-        [_get_python_executable(), "--version"],
+    stdout, stderr = execute(
+        [python_executable(), "--version"],
         env=os.environ,
     )
     if stderr:
         raise PyPackagesError(stderr.decode())
 
-    python_version = re.search("Python ([0-9]*\.[0-9]*)", stdout.decode()).group(1)
-    return os.path.join(pypackages_path, python_version, "lib")
+    python_version = re.search(
+        "Python ([0-9]*\.[0-9]*)", stdout.decode()
+    ).group(1)
+    return os.path.join(pypackages_path(window), python_version, "lib")
 
-# TODO: Include into `sublime.WindowCommand` class
-def _get_env(env=None):
-    if not env:
-        env = os.environ
 
-    path = env.get("PATH", "")
-    pythonpath = env.get("PYTHONPATH", "")
-    pypackages_path = os.pathsep.join([".", _get_pypackages_lib_path()])
+class PyPackagesError(Exception):
+    pass
 
-    env["PYPACKAGES"] = pypackages_path
 
-    if not pythonpath.startswith(pypackages_path):
-        env["PYTHONPATH"] = os.pathsep.join(
-            [pypackages_path, pythonpath]
-        )
+class PypackagesCommand(sublime_plugin.WindowCommand):
 
-    python_path = _get_python_executable_path()
-    if not path.startswith(python_path):
-        # Adds an additional pathsep to make the change trackable
-        env["PATH"] = os.pathsep.join(
-            [python_path, "", path]
-        )
+    def _get_project_path(self):
+        return project_path(self.window)
 
-    return env
+    def _get_pypackages_path(self):
+        return pypackages_path(self.window)
+
+    def _get_pypackages_lib_path(self):
+        return pypackages_lib_path(self.window)
+
+    def _get_env(self, env=None):
+        if not env:
+            env = os.environ
+
+        path = env.get("PATH", "")
+        pythonpath = env.get("PYTHONPATH", "")
+        env["PYPACKAGESPATH"] = self._get_pypackages_lib_path()
+        pypackages = os.pathsep.join([".", env["PYPACKAGESPATH"]])
+
+        if not pythonpath.startswith(pypackages):
+            env["PYTHONPATH"] = os.pathsep.join(
+                [pypackages, pythonpath]
+            )
+
+        python_path = python_executable_path()
+        if not path.startswith(python_path):
+            # Adds an additional pathsep to make the change trackable
+            env["PATH"] = os.pathsep.join(
+                [python_path, "", path]
+            )
+
+        return env
+
+
+class PypackagesProjectCommand(PypackagesCommand):
+    def is_enabled(self):
+        return bool(self._get_project_path() and os.getenv("PYPACKAGESPATH"))
 
 
 class ProjectEnvironmentListener(sublime_plugin.EventListener):
@@ -172,7 +178,7 @@ class ProjectEnvironmentListener(sublime_plugin.EventListener):
         else:
             self.active_project = active_project
             if sublime.load_settings("pypackages.sublime-settings").get("auto_toggle"):
-                if self.active_project and os.path.exists(_get_pypackages_path()):
+                if self.active_project and os.path.exists(pypackages_path()):
                     threading.Thread(target=self._enable_pypackages).start()
                 else:
                     threading.Thread(target=self._disable_pypackages).start()
@@ -184,15 +190,18 @@ class ProjectEnvironmentListener(sublime_plugin.EventListener):
         sublime.active_window().run_command("disable_pypackages")
 
 
-class EnablePypackagesCommand(sublime_plugin.WindowCommand):
+class EnablePypackagesCommand(PypackagesCommand):
     def run(self):
-        if _get_project_path():
+        if self._get_project_path():
+            if os.getenv("PYPACKAGESPATH"):
+                return
+
             sublime.status_message("PyPackages enabled")
             log("Set local environment")
 
-            os.environ = _get_env()
+            os.environ = self._get_env()
 
-            debug_log("PYPACKAGES=\"{}\"".format(os.getenv("PYPACKAGES", "")))
+            debug_log("PYPACKAGESPATH=\"{}\"".format(os.getenv("PYPACKAGESPATH", "")))
             debug_log("PYTHONPATH=\"{}\"".format(os.getenv("PYTHONPATH", "")))
             debug_log("PATH=\"{}\"".format(os.getenv("PATH", "")))
         else:
@@ -200,17 +209,19 @@ class EnablePypackagesCommand(sublime_plugin.WindowCommand):
             log("No project")
 
     def is_visible(self):
-        return bool(_get_project_path() and not os.getenv("PYPACKAGES"))
+        return bool(self._get_project_path() and not os.getenv("PYPACKAGESPATH"))
 
 
-class DisablePypackagesCommand(sublime_plugin.WindowCommand):
+class DisablePypackagesCommand(PypackagesCommand):
     def run(self):
+        if not os.getenv("PYPACKAGESPATH"):
+            return
+
         sublime.status_message("PyPackages disabled")
         log("Unset local environment")
 
-        del os.environ["PYPACKAGES"]
+        del os.environ["PYPACKAGESPATH"]
 
-        # TODO: Pathseps are not always removed correctly
         os.environ["PYTHONPATH"] = re.sub(
             ".{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
             .format(sep=os.sep, pathsep=os.pathsep),
@@ -220,36 +231,41 @@ class DisablePypackagesCommand(sublime_plugin.WindowCommand):
 
         # Uses the additional pathseps to find the correct paths
         os.environ["PATH"] = os.getenv("PATH", "").replace(
-            _get_python_executable_path() + os.pathsep + os.pathsep, "", 1
+            python_executable_path() + os.pathsep + os.pathsep, "", 1
         )
 
-        debug_log("PYPACKAGES=\"{}\"".format(os.getenv("PYPACKAGES", "")))
+        debug_log("PYPACKAGESPATH=\"{}\"".format(os.getenv("PYPACKAGESPATH", "")))
         debug_log("PYTHONPATH=\"{}\"".format(os.getenv("PYTHONPATH", "")))
         debug_log("PATH=\"{}\"".format(os.getenv("PATH", "")))
 
     def is_visible(self):
-        return bool(_get_project_path() and os.getenv("PYPACKAGES"))
+        return bool(self._get_project_path() and os.getenv("PYPACKAGESPATH"))
 
 class PypackagesInstallCommand(PypackagesProjectCommand):
     def run(self, upgrade=False):
         if upgrade:
             threading.Thread(target=self._list).start()
         else:
-            self.window.show_input_panel("Packages:", "", self._install, None, None)
+            self.window.show_input_panel(
+                "Packages:", "", self._install, None, None
+            )
 
     def _install(self, packages, upgrade=False):
         sublime.status_message("Installing pip packages...")
 
-        install_args = ["install", "--target", _get_pypackages_lib_path(), packages]
+        install_args = ["install", "--target", self._get_pypackages_lib_path(), packages]
         if upgrade:
             install_args += ["--upgrade"]
 
-        stdout, stderr = _pip(install_args, env=_get_env())
+        stdout, stderr = pip(
+            install_args, env=self._get_env(), cwd=self._get_project_path()
+        )
         if stderr:
             for line in stderr.decode().split(os.linesep):
                 if "--upgrade" in line:
                     pattern = "{}([^\s]*)".format(
-                        (_get_pypackages_lib_path() + os.sep).replace("\\", "\\\\")
+                        (self._get_pypackages_lib_path() + os.sep)
+                        .replace("\\", "\\\\")
                     )
                     log("{} already exists. Upgrade to replace it.".format(
                         re.search(pattern, line).group(1)
@@ -267,25 +283,25 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
         self._install(package.split()[0], upgrade=True)
 
     def _list(self):
-        self.packages = _pkg_list(_get_pypackages_lib_path())
+        self.packages = pkg_list(self._get_pypackages_lib_path())
         self.window.show_quick_panel(self.packages, self._upgrade)
 
 
 class PypackagesListCommand(PypackagesProjectCommand):
     def run(self):
-        if os.path.exists(_get_pypackages_path()):
+        if os.path.exists(self._get_pypackages_path()):
             threading.Thread(target=self._list).start()
         else:
             sublime.status_message("No __pypackages__ directory")
 
     def _list(self):
-        packages = _pkg_list(_get_pypackages_lib_path())
+        packages = pkg_list(self._get_pypackages_lib_path())
         self.window.show_quick_panel(packages, None)
 
 
 class PypackagesUninstallCommand(PypackagesProjectCommand):
     def run(self):
-        if os.path.exists(_get_pypackages_path()):
+        if os.path.exists(self._get_pypackages_path()):
             threading.Thread(target=self._list).start()
         else:
             sublime.status_message("No __pypackages__ directory")
@@ -298,7 +314,9 @@ class PypackagesUninstallCommand(PypackagesProjectCommand):
         uninstall_args = ["uninstall", "-y", package.split()[0]]
 
         sublime.status_message("Uninstalling pip package...")
-        stdout, stderr = _pip(uninstall_args, env=_get_env())
+        stdout, stderr = pip(
+            uninstall_args, env=self._get_env(), cwd=self._get_project_path()
+        )
         if stderr:
             debug_log(stderr)
         if stdout:
@@ -307,14 +325,16 @@ class PypackagesUninstallCommand(PypackagesProjectCommand):
                     log(line.strip())
 
     def _list(self):
-        self.packages = _pkg_list(_get_pypackages_lib_path())
+        self.packages = pkg_list(self._get_pypackages_lib_path())
         self.window.show_quick_panel(self.packages, self._uninstall)
 
 
 class PypackagesFreezeCommand(PypackagesProjectCommand):
     def run(self):
-        if os.path.exists(_get_pypackages_path()):
-            self.window.show_input_panel("Target:", "requirements.txt", self._freeze, None, None)
+        if os.path.exists(self._get_pypackages_path()):
+            self.window.show_input_panel(
+                "Target:", "requirements.txt", self._freeze, None, None
+            )
         else:
             sublime.status_message("No __pypackages__ directory")
 
@@ -322,6 +342,6 @@ class PypackagesFreezeCommand(PypackagesProjectCommand):
         sublime.status_message("Freezing pip packages...")
 
         with open(filename, "w") as target:
-            for package in _pkg_list(_get_pypackages_lib_path()):
+            for package in pkg_list(self._get_pypackages_lib_path()):
                 target.write(package + os.linesep)
                 debug_log(package)
