@@ -1,0 +1,31 @@
+[
+    {
+        "caption": "PyPackages: Enable",
+        "command": "enable_pypackages"
+    },
+    {
+        "caption": "PyPackages: Disable",
+        "command": "disable_pypackages"
+    },
+    {
+        "caption": "PyPackages: Install",
+        "command": "pypackages_install"
+    },
+    {
+        "caption": "PyPackages: Upgrade",
+        "command": "pypackages_install",
+        "args": {"upgrade": true}
+    },
+    {
+        "caption": "PyPackages: List",
+        "command": "pypackages_list"
+    },
+    {
+        "caption": "PyPackages: Uninstall",
+        "command": "pypackages_uninstall"
+    },
+    {
+        "caption": "PyPackages: Freeze",
+        "command": "pypackages_freeze"
+    }
+]

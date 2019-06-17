@@ -12,14 +12,14 @@
                 "children":
                 [
                     {
-                        "caption": "Pythonloc",
+                        "caption": "PyPackages",
                         "children":
                         [
                             {
                                 "caption": "Settings",
                                 "command": "edit_settings",
                                 "args": {
-                                    "base_file": "${packages}/pythonloc/pythonloc.sublime-settings",
+                                    "base_file": "${packages}/PyPackages/pypackages.sublime-settings",
                                     "default": "// Settings in here override the default settings.\n{\n\t$0\n}\n"
                                 }
                             }

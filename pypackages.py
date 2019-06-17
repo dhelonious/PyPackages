@@ -1,6 +1,8 @@
 # encoding: utf-8
+# pylint: disable=attribute-defined-outside-init
 
 # TODO: Improve usage of `status_message`
+# TODO: Improve error handling and logging
 
 import os
 import re
@@ -8,100 +10,65 @@ import shutil
 import subprocess
 import threading
 
-from .lib import pkg_resources
-
 import sublime
 import sublime_plugin
 
+# pylint: disable=relative-beyond-top-level
+from .lib import pkg_resources
+
 
 def log(msg):
-    print("[pythonloc] {}".format(msg))
+    if not msg == "":
+        print("[PyPackages] {}".format(msg))
 
 def debug_log(msg):
-    if sublime.load_settings("pythonloc.sublime-settings").get("debug", False):
-        print("[pythonloc] [debug] {}".format(msg))
+    if sublime.load_settings("pypackages.sublime-settings").get("debug", False):
+        if not msg == "":
+            log("[DEBUG] {}".format(msg))
 
-class PythonlocError(Exception):
+class PyPackagesError(Exception):
     pass
 
-class PythonlocProjectCommand(sublime_plugin.WindowCommand):
+class PypackagesCommand(sublime_plugin.WindowCommand):
+    pass
+
+class PypackagesProjectCommand(PypackagesCommand):
     def is_enabled(self):
-        return bool(_get_project_path() and os.getenv("PYTHONLOC", False))
+        return bool(_get_project_path() and os.getenv("PYPACKAGES"))
 
 
-def _get_python_executable():
-    settings = sublime.load_settings("pythonloc.sublime-settings")
-    return settings.get("python_executable").get(sublime.platform())
-
-def _get_python_executable_path():
-    return os.path.dirname(shutil.which(_get_python_executable()))
-
-def _get_project_path():
-    return sublime.active_window().extract_variables().get("project_path", None)
-
-def _get_pypackages_path():
-    """Return local __pypackages__ path relative to the script being run
-
-    See https://www.python.org/dev/peps/pep-0582/
-    """
-    # TODO: Configurable __pypackages__ location
-    return os.path.join(_get_project_path(), "__pypackages__")
-
-def _get_pypackages_lib_path():
-    pypackages_path = _get_pypackages_path()
-
+def _execute(cmd, env=None, cwd=None):
     stdout, stderr = subprocess.Popen(
-        [_get_python_executable(), "--version"],
-        env=os.environ,
+        cmd,
+        env=env,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=sublime.platform()=="windows",
     ).communicate()
 
-    if stderr:
-        raise PythonlocError(stderr.decode())
+    debug_log("stdout: {}".format(stdout.decode()))
+    debug_log("stderr: {}".format(stderr.decode()))
 
-    python_version = re.search("Python ([0-9]*\.[0-9]*)", stdout.decode()).group(1)
-    return os.path.join(pypackages_path, python_version, "lib")
+    return stdout, stderr
 
-def _get_env(env=None):
-    if not env:
-        env = os.environ
-    pythonpath = env.get("PYTHONPATH", "")
-    pypackages_path = os.pathsep.join([".", _get_pypackages_lib_path()])
-    if not pythonpath.startswith(pypackages_path):
-        env["PYTHONPATH"] = os.pathsep.join(
-            [pypackages_path, pythonpath]
-        )
-    path = env.get("PATH", "")
-    python_path = _get_python_executable_path()
-    if not path.startswith(python_path):
-        env["PATH"] = os.pathsep.join(
-            [python_path, path]
-        )
-    return env
-
-def _piploc(args, env=None):
+def _pip(args, env=None):
     python = _get_python_executable()
     pip_cmd = [python, "-m", "pip"] + args
 
     debug_log(pip_cmd)
-    stdout, stderr = subprocess.Popen(
+    stdout, stderr = _execute(
         pip_cmd,
         env=env,
         cwd=_get_project_path(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=sublime.platform()=="windows",
-    ).communicate()
-
+    )
     if stderr:
-        log("[Piploc] Command \"{}\" failed".format(" ".join(pip_cmd)))
+        log("[Pypackages] Command \"{}\" failed".format(" ".join(pip_cmd)))
         debug_log(stderr.decode())
 
     return stdout, stderr
 
-def _list_packages(packages_path):
+def _pkg_list(packages_path):
     pkg_path = pkg_resources.Environment([packages_path])
 
     packages = []
@@ -113,6 +80,82 @@ def _list_packages(packages_path):
         sublime.status_message("No packages found")
 
     return packages
+
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_python_executable():
+    settings = sublime.load_settings("pypackages.sublime-settings")
+    return settings.get("python_executable").get(sublime.platform())
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_python_executable_path():
+    python_executable = _get_python_executable()
+    path = shutil.which(python_executable)
+    return os.path.dirname(path if path else python_executable)
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_project_path():
+    return sublime.active_window().extract_variables().get("project_path", ".")
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_pypackages_path():
+    """Return local __pypackages__ path relative to the script being run
+
+    See https://www.python.org/dev/peps/pep-0582/
+    """
+    window = sublime.active_window()
+    view = window.active_view()
+
+    debug_log(view.settings().has("pypackages_root"))
+    pypackages_root = view.settings().get(
+        "pypackages_root", _get_project_path()
+    )
+    pypackages_root = sublime.expand_variables(
+        pypackages_root, window.extract_variables()
+    )
+
+    debug_log("pypackages_root: {}".format(pypackages_root))
+
+    return os.path.join(pypackages_root, "__pypackages__")
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_pypackages_lib_path():
+    pypackages_path = _get_pypackages_path()
+
+    stdout, stderr = _execute(
+        [_get_python_executable(), "--version"],
+        env=os.environ,
+    )
+    if stderr:
+        raise PyPackagesError(stderr.decode())
+
+    python_version = re.search("Python ([0-9]*\.[0-9]*)", stdout.decode()).group(1)
+    return os.path.join(pypackages_path, python_version, "lib")
+
+# TODO: Include into `sublime.WindowCommand` class
+def _get_env(env=None):
+    if not env:
+        env = os.environ
+
+    path = env.get("PATH", "")
+    pythonpath = env.get("PYTHONPATH", "")
+    pypackages_path = os.pathsep.join([".", _get_pypackages_lib_path()])
+
+    env["PYPACKAGES"] = pypackages_path
+
+    if not pythonpath.startswith(pypackages_path):
+        env["PYTHONPATH"] = os.pathsep.join(
+            [pypackages_path, pythonpath]
+        )
+
+    python_path = _get_python_executable_path()
+    if not path.startswith(python_path):
+        # Adds an additional pathsep to make the change trackable
+        env["PATH"] = os.pathsep.join(
+            [python_path, "", path]
+        )
+
+    return env
 
 
 class ProjectEnvironmentListener(sublime_plugin.EventListener):
@@ -128,30 +171,28 @@ class ProjectEnvironmentListener(sublime_plugin.EventListener):
             return
         else:
             self.active_project = active_project
-            if sublime.load_settings("pythonloc.sublime-settings").get("auto_toggle"):
+            if sublime.load_settings("pypackages.sublime-settings").get("auto_toggle"):
                 if self.active_project and os.path.exists(_get_pypackages_path()):
-                    threading.Thread(target=self._enable_pythonloc).start()
+                    threading.Thread(target=self._enable_pypackages).start()
                 else:
-                    threading.Thread(target=self._disable_pythonloc).start()
+                    threading.Thread(target=self._disable_pypackages).start()
 
-    def _enable_pythonloc(self):
-        sublime.active_window().run_command("enable_pythonloc")
+    def _enable_pypackages(self):
+        sublime.active_window().run_command("enable_pypackages")
 
-    def _disable_pythonloc(self):
-        sublime.active_window().run_command("disable_pythonloc")
+    def _disable_pypackages(self):
+        sublime.active_window().run_command("disable_pypackages")
 
 
-class EnablePythonlocCommand(sublime_plugin.WindowCommand):
+class EnablePypackagesCommand(sublime_plugin.WindowCommand):
     def run(self):
         if _get_project_path():
-            sublime.status_message("Pythonloc enabled")
+            sublime.status_message("PyPackages enabled")
             log("Set local environment")
 
-            env = _get_env()
-            env["PYTHONLOC"] = "enabled"
-            os.environ = env
+            os.environ = _get_env()
 
-            debug_log("PYTHONLOC=\"{}\"".format(os.getenv("PYTHONLOC", "")))
+            debug_log("PYPACKAGES=\"{}\"".format(os.getenv("PYPACKAGES", "")))
             debug_log("PYTHONPATH=\"{}\"".format(os.getenv("PYTHONPATH", "")))
             debug_log("PATH=\"{}\"".format(os.getenv("PATH", "")))
         else:
@@ -159,30 +200,37 @@ class EnablePythonlocCommand(sublime_plugin.WindowCommand):
             log("No project")
 
     def is_visible(self):
-        return bool(_get_project_path() and not os.getenv("PYTHONLOC", False))
+        return bool(_get_project_path() and not os.getenv("PYPACKAGES"))
 
 
-class DisablePythonlocCommand(sublime_plugin.WindowCommand):
+class DisablePypackagesCommand(sublime_plugin.WindowCommand):
     def run(self):
-        sublime.status_message("Pythonloc disabled")
+        sublime.status_message("PyPackages disabled")
         log("Unset local environment")
 
-        del os.environ["PYTHONLOC"]
-        os.environ["PYTHONPATH"] = os.getenv("PYTHONPATH").replace(
-            os.pathsep.join([".", _get_pypackages_lib_path(), ""]), "", 1
-        )
-        os.environ["PATH"] = os.getenv("PATH").replace(
-            _get_python_executable_path() + os.pathsep, "", 1
+        del os.environ["PYPACKAGES"]
+
+        # TODO: Pathseps are not always removed correctly
+        os.environ["PYTHONPATH"] = re.sub(
+            ".{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
+            .format(sep=os.sep, pathsep=os.pathsep),
+            "",
+            os.getenv("PYTHONPATH", "")
         )
 
-        debug_log("PYTHONLOC=\"{}\"".format(os.getenv("PYTHONLOC", "")))
+        # Uses the additional pathseps to find the correct paths
+        os.environ["PATH"] = os.getenv("PATH", "").replace(
+            _get_python_executable_path() + os.pathsep + os.pathsep, "", 1
+        )
+
+        debug_log("PYPACKAGES=\"{}\"".format(os.getenv("PYPACKAGES", "")))
         debug_log("PYTHONPATH=\"{}\"".format(os.getenv("PYTHONPATH", "")))
         debug_log("PATH=\"{}\"".format(os.getenv("PATH", "")))
 
     def is_visible(self):
-        return bool(_get_project_path() and os.getenv("PYTHONLOC", False))
+        return bool(_get_project_path() and os.getenv("PYPACKAGES"))
 
-class PiplocInstallCommand(PythonlocProjectCommand):
+class PypackagesInstallCommand(PypackagesProjectCommand):
     def run(self, upgrade=False):
         if upgrade:
             threading.Thread(target=self._list).start()
@@ -196,14 +244,13 @@ class PiplocInstallCommand(PythonlocProjectCommand):
         if upgrade:
             install_args += ["--upgrade"]
 
-        stdout, stderr = _piploc(install_args, env=_get_env())
+        stdout, stderr = _pip(install_args, env=_get_env())
         if stderr:
             for line in stderr.decode().split(os.linesep):
                 if "--upgrade" in line:
                     pattern = "{}([^\s]*)".format(
                         (_get_pypackages_lib_path() + os.sep).replace("\\", "\\\\")
                     )
-                    package = re.search(pattern, line).group(1)
                     log("{} already exists. Upgrade to replace it.".format(
                         re.search(pattern, line).group(1)
                     ))
@@ -220,11 +267,11 @@ class PiplocInstallCommand(PythonlocProjectCommand):
         self._install(package.split()[0], upgrade=True)
 
     def _list(self):
-        self.packages = _list_packages(_get_pypackages_lib_path())
+        self.packages = _pkg_list(_get_pypackages_lib_path())
         self.window.show_quick_panel(self.packages, self._upgrade)
 
 
-class PiplocListCommand(PythonlocProjectCommand):
+class PypackagesListCommand(PypackagesProjectCommand):
     def run(self):
         if os.path.exists(_get_pypackages_path()):
             threading.Thread(target=self._list).start()
@@ -232,11 +279,11 @@ class PiplocListCommand(PythonlocProjectCommand):
             sublime.status_message("No __pypackages__ directory")
 
     def _list(self):
-        packages = _list_packages(_get_pypackages_lib_path())
+        packages = _pkg_list(_get_pypackages_lib_path())
         self.window.show_quick_panel(packages, None)
 
 
-class PiplocUninstallCommand(PythonlocProjectCommand):
+class PypackagesUninstallCommand(PypackagesProjectCommand):
     def run(self):
         if os.path.exists(_get_pypackages_path()):
             threading.Thread(target=self._list).start()
@@ -251,18 +298,20 @@ class PiplocUninstallCommand(PythonlocProjectCommand):
         uninstall_args = ["uninstall", "-y", package.split()[0]]
 
         sublime.status_message("Uninstalling pip package...")
-        stdout, stderr = _piploc(uninstall_args, env=_get_env())
+        stdout, stderr = _pip(uninstall_args, env=_get_env())
+        if stderr:
+            debug_log(stderr)
         if stdout:
             for line in stdout.decode().split(os.linesep):
                 if "Successfully" in line:
                     log(line.strip())
 
     def _list(self):
-        self.packages = _list_packages(_get_pypackages_lib_path())
+        self.packages = _pkg_list(_get_pypackages_lib_path())
         self.window.show_quick_panel(self.packages, self._uninstall)
 
 
-class PiplocFreezeCommand(PythonlocProjectCommand):
+class PypackagesFreezeCommand(PypackagesProjectCommand):
     def run(self):
         if os.path.exists(_get_pypackages_path()):
             self.window.show_input_panel("Target:", "requirements.txt", self._freeze, None, None)
@@ -273,6 +322,6 @@ class PiplocFreezeCommand(PythonlocProjectCommand):
         sublime.status_message("Freezing pip packages...")
 
         with open(filename, "w") as target:
-            for package in _list_packages(_get_pypackages_lib_path()):
+            for package in _pkg_list(_get_pypackages_lib_path()):
                 target.write(package + os.linesep)
                 debug_log(package)
