@@ -172,6 +172,11 @@ class ProjectEnvironmentListener(sublime_plugin.EventListener):
         self.pypackages = None
 
     def on_activated(self, view):
+        if os.getenv("PYPACKAGESPATH"):
+            view.set_status("pypackages", "__pypackages__")
+        else:
+            view.erase_status("pypackages")
+
         active_project = sublime.active_window().project_file_name()
         if active_project == self.active_project:
             return
@@ -197,6 +202,7 @@ class EnablePypackagesCommand(PypackagesCommand):
                 return
 
             sublime.status_message("PyPackages enabled")
+            sublime.active_window().active_view().set_status("pypackages", "__pypackages__")
             log("Set local environment")
 
             os.environ = self._get_env()
@@ -218,6 +224,7 @@ class DisablePypackagesCommand(PypackagesCommand):
             return
 
         sublime.status_message("PyPackages disabled")
+        sublime.active_window().active_view().erase_status("pypackages")
         log("Unset local environment")
 
         del os.environ["PYPACKAGESPATH"]
