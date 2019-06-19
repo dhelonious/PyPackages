@@ -57,8 +57,27 @@ def pip(args, env=None, cwd=None):
 
     return stdout, stderr
 
+def python_executable():
+    settings = sublime.load_settings("pypackages.sublime-settings")
+    return settings.get("python_executable").get(sublime.platform())
+
+def python_version():
+    stdout, stderr = execute(
+        [python_executable(), "--version"],
+        env=os.environ,
+    )
+    if stderr:
+        raise PyPackagesError(stderr.decode())
+
+    return re.search("Python ([0-9]*\.[0-9]*)", stdout.decode()).group(1)
+
+def python_executable_path():
+    python = python_executable()
+    path = shutil.which(python)
+    return os.path.dirname(path if path else python)
+
 def pkg_list(packages_path):
-    pkg_path = pkg_resources.Environment([packages_path])
+    pkg_path = pkg_resources.Environment([packages_path], python=python_version())
 
     packages = []
     for version in pkg_path:
@@ -69,15 +88,6 @@ def pkg_list(packages_path):
         sublime.status_message("No packages found")
 
     return packages
-
-def python_executable():
-    settings = sublime.load_settings("pypackages.sublime-settings")
-    return settings.get("python_executable").get(sublime.platform())
-
-def python_executable_path():
-    python = python_executable()
-    path = shutil.which(python)
-    return os.path.dirname(path if path else python)
 
 def project_path(window=None):
     if not window:
@@ -107,17 +117,7 @@ def pypackages_lib_path(window=None):
     if not window:
         window = sublime.active_window()
 
-    stdout, stderr = execute(
-        [python_executable(), "--version"],
-        env=os.environ,
-    )
-    if stderr:
-        raise PyPackagesError(stderr.decode())
-
-    python_version = re.search(
-        "Python ([0-9]*\.[0-9]*)", stdout.decode()
-    ).group(1)
-    return os.path.join(pypackages_path(window), python_version, "lib")
+    return os.path.join(pypackages_path(window), python_version(), "lib")
 
 
 class PyPackagesError(Exception):
