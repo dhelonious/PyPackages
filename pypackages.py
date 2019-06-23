@@ -350,5 +350,5 @@ class PypackagesFreezeCommand(PypackagesProjectCommand):
 
         with open(filename, "w") as target:
             for package in pkg_list(self._get_pypackages_lib_path()):
-                target.write(package + os.linesep)
                 debug_log(package)
+                print(package, file=target)
