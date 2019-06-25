@@ -1,6 +1,10 @@
 # encoding: utf-8
 # pylint: disable=attribute-defined-outside-init
 
+"""
+https://www.python.org/dev/peps/pep-0582/
+"""
+
 # TODO: Improve usage of `status_message`
 # TODO: Improve error handling and logging
 
@@ -15,6 +19,7 @@ import sublime_plugin
 
 # pylint: disable=relative-beyond-top-level
 from .lib import pkg_resources
+from .lib.thread_progress import ThreadProgress
 
 
 def log(msg):
@@ -95,10 +100,6 @@ def project_path(window=None):
     return window.extract_variables().get("project_path", ".")
 
 def pypackages_path(window=None):
-    """Return local __pypackages__ path relative to the script being run
-
-    See https://www.python.org/dev/peps/pep-0582/
-    """
     if not window:
         window = sublime.active_window()
 
@@ -230,7 +231,7 @@ class DisablePypackagesCommand(PypackagesCommand):
         del os.environ["PYPACKAGESPATH"]
 
         os.environ["PYTHONPATH"] = re.sub(
-            ".{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
+            r".{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
             .format(sep=os.sep, pathsep=os.pathsep),
             "",
             os.getenv("PYTHONPATH", "")
@@ -248,6 +249,7 @@ class DisablePypackagesCommand(PypackagesCommand):
     def is_visible(self):
         return bool(self._get_project_path() and os.getenv("PYPACKAGESPATH"))
 
+
 class PypackagesInstallCommand(PypackagesProjectCommand):
     def run(self, upgrade=False):
         if upgrade:
@@ -258,7 +260,12 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
             )
 
     def _install(self, packages, upgrade=False):
-        sublime.status_message("Installing pip packages...")
+        thread = threading.Thread(target=self._install_thread, args=[packages, upgrade])
+        thread.start()
+        ThreadProgress(thread, "pip install", "")
+
+    def _install_thread(self, packages, upgrade):
+        # sublime.status_message("Installing pip packages...")
 
         install_args = ["install", "--target", self._get_pypackages_lib_path(), packages]
         if upgrade:
@@ -270,7 +277,7 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
         if stderr:
             for line in stderr.decode().split(os.linesep):
                 if "--upgrade" in line:
-                    pattern = "{}([^\s]*)".format(
+                    pattern = r"{}([^\s]*)".format(
                         (self._get_pypackages_lib_path() + os.sep)
                         .replace("\\", "\\\\")
                     )
@@ -318,9 +325,14 @@ class PypackagesUninstallCommand(PypackagesProjectCommand):
             return
 
         package = self.packages[package_index]
+        thread = threading.Thread(target=self._uninstall_thread, args=[package])
+        thread.start()
+        ThreadProgress(thread, "pip uninstall", "")
+
+    def _uninstall_thread(self, package):
+
         uninstall_args = ["uninstall", "-y", package.split()[0]]
 
-        sublime.status_message("Uninstalling pip package...")
         stdout, stderr = pip(
             uninstall_args, env=self._get_env(), cwd=self._get_project_path()
         )
