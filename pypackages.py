@@ -265,9 +265,8 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
         ThreadProgress(thread, "pip install", "")
 
     def _install_thread(self, packages, upgrade):
-        # sublime.status_message("Installing pip packages...")
-
-        install_args = ["install", "--target", self._get_pypackages_lib_path(), packages]
+        install_args = ["install", "--target", self._get_pypackages_lib_path()]
+        install_args += packages.split()
         if upgrade:
             install_args += ["--upgrade"]
 
