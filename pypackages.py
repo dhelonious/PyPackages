@@ -200,7 +200,7 @@ class EnablePypackagesCommand(PypackagesCommand):
     def run(self):
         if self._get_project_path():
             if os.getenv("PYPACKAGESPATH"):
-                return
+                sublime.active_window().run_command("disable_pypackages", args={"quiet": True})
 
             sublime.status_message("PyPackages enabled")
             sublime.active_window().active_view().set_status("pypackages", "__pypackages__")
@@ -220,13 +220,14 @@ class EnablePypackagesCommand(PypackagesCommand):
 
 
 class DisablePypackagesCommand(PypackagesCommand):
-    def run(self):
+    def run(self, quiet=False):
         if not os.getenv("PYPACKAGESPATH"):
             return
 
         sublime.status_message("PyPackages disabled")
         sublime.active_window().active_view().erase_status("pypackages")
-        log("Unset local environment")
+        if not quiet:
+            log("Unset local environment")
 
         del os.environ["PYPACKAGESPATH"]
 
