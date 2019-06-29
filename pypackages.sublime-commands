@@ -12,6 +12,11 @@
         "command": "pypackages_install"
     },
     {
+        "caption": "PyPackages: Install Requirements",
+        "command": "pypackages_install",
+        "args": {"requirements": true}
+    },
+    {
         "caption": "PyPackages: Upgrade",
         "command": "pypackages_install",
         "args": {"upgrade": true}

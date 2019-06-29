@@ -18,15 +18,16 @@ This package provides commands to manage and use your local `__pypackages__` dir
 
 ## Commands
 
-| Command                      | Description                                                                                                                                  |
-| --                           | --                                                                                                                                           |
-| `PyPackages:`<br>`Enable`    | Enable PyPackages in the current project. This enables the other PyPackages commands and modifies the Sublime Text 3 environment accordingly |
-| `PyPackages:`<br>`Install`   | Install package into the local `__pypackages__` directory                                                                                    |
-| `PyPackages:`<br>`Upgrade`   | Upgrade selected package in the local `__pypackages__` directory                                                                             |
-| `PyPackages:`<br>`List`      | Show packages installed in the local `__pypackages__` directory                                                                              |
-| `PyPackages:`<br>`Uninstall` | Remove packages from the local `__pypackages__` directory                                                                                    |
-| `PyPackages:`<br>`freeze`    | Freeze the currently installed packages into a requirement file                                                                              |
-| `PyPackages:`<br>`Disable`   | Disable PyPackages in the current project. This removes the changes made to the Sublime Text 3 environment                                   |
+| Command                                 | Description                                                                                                                                  |
+| --                                      | --                                                                                                                                           |
+| `PyPackages:`<br>`Enable`               | Enable PyPackages in the current project. This enables the other PyPackages commands and modifies the Sublime Text 3 environment accordingly |
+| `PyPackages:`<br>`Install`              | Install packages into the local `__pypackages__` directory                                                                                   |
+| `PyPackages:`<br>`Install Requirements` | Install packages from a requirements file (relative to the project path) into the local `__pypackages__` directory                           |
+| `PyPackages:`<br>`Upgrade`              | Upgrade selected package in the local `__pypackages__` directory                                                                             |
+| `PyPackages:`<br>`List`                 | Show packages installed in the local `__pypackages__` directory                                                                              |
+| `PyPackages:`<br>`Uninstall`            | Remove packages from the local `__pypackages__` directory                                                                                    |
+| `PyPackages:`<br>`freeze`               | Freeze the currently installed packages into a requirement file                                                                              |
+| `PyPackages:`<br>`Disable`              | Disable PyPackages in the current project. This removes the changes made to the Sublime Text 3 environment                                   |
 
 ## Settings
 

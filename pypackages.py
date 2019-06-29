@@ -252,23 +252,37 @@ class DisablePypackagesCommand(PypackagesCommand):
 
 
 class PypackagesInstallCommand(PypackagesProjectCommand):
-    def run(self, upgrade=False):
+    def run(self, upgrade=False, requirements=False):
+        self.upgrade = upgrade
+        self.requirements = requirements
+
         if upgrade:
             threading.Thread(target=self._list).start()
         else:
+            label = "Packages"
+            text = ""
+            if requirements:
+                label = "Requirements"
+                text = "requirements.txt"
+
             self.window.show_input_panel(
-                "Packages:", "", self._install, None, None
+                label + ":", text, self._install, None, None
             )
 
-    def _install(self, packages, upgrade=False):
-        thread = threading.Thread(target=self._install_thread, args=[packages, upgrade])
+    def _install(self, args):
+        thread = threading.Thread(target=self._install_thread, args=[args])
         thread.start()
-        ThreadProgress(thread, "pip install", "")
+        ThreadProgress(thread)
 
-    def _install_thread(self, packages, upgrade):
+    def _install_thread(self, args):
         install_args = ["install", "--target", self._get_pypackages_lib_path()]
-        install_args += packages.split()
-        if upgrade:
+
+        if self.requirements:
+            install_args += ["-r", os.path.join(self._get_project_path(), args)]
+        else:
+            install_args += args.split()
+
+        if self.upgrade:
             install_args += ["--upgrade"]
 
         stdout, stderr = pip(
@@ -294,7 +308,7 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
             return
 
         package = self.packages[package_index]
-        self._install(package.split()[0], upgrade=True)
+        self._install(package.split()[0])
 
     def _list(self):
         self.packages = pkg_list(self._get_pypackages_lib_path())
