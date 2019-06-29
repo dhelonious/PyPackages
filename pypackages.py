@@ -374,7 +374,10 @@ class PypackagesFreezeCommand(PypackagesProjectCommand):
     def _freeze(self, filename):
         sublime.status_message("Freezing pip packages...")
 
-        with open(filename, "w") as target:
+        target_file = os.path.join(self._get_project_path(), filename)
+        debug_log("Requirements file: {}".format(target_file))
+
+        with open(target_file, "w") as target:
             for package in pkg_list(self._get_pypackages_lib_path()):
                 debug_log(package)
                 print(package, file=target)
