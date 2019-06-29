@@ -57,7 +57,7 @@ def pip(args, env=None, cwd=None):
         cwd=cwd,
     )
     if stderr:
-        log("[Pypackages] Command \"{}\" failed".format(" ".join(pip_cmd)))
+        log("Command \"{}\" failed".format(" ".join(pip_cmd)))
         debug_log(stderr.decode())
 
     return stdout, stderr
@@ -341,7 +341,7 @@ class PypackagesUninstallCommand(PypackagesProjectCommand):
         package = self.packages[package_index]
         thread = threading.Thread(target=self._uninstall_thread, args=[package])
         thread.start()
-        ThreadProgress(thread, "pip uninstall", "")
+        ThreadProgress(thread)
 
     def _uninstall_thread(self, package):
 

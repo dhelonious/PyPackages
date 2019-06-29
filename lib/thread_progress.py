@@ -13,7 +13,7 @@ class ThreadProgress():
             complete
     """
 
-    def __init__(self, thread, message, success_message):
+    def __init__(self, thread, message="PyPackages", success_message=""):
         self.thread = thread
         self.message = message
         self.success_message = success_message
