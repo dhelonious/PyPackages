@@ -232,8 +232,8 @@ class DisablePypackagesCommand(PypackagesCommand):
         del os.environ["PYPACKAGESPATH"]
 
         os.environ["PYTHONPATH"] = re.sub(
-            r".{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
-            .format(sep=os.sep, pathsep=os.pathsep),
+            r"\.{pathsep}.*__pypackages__{sep}[0-9]+\.[0-9]+{sep}lib{pathsep}"
+            .format(sep=os.sep.replace("\\", "\\\\"), pathsep=os.pathsep),
             "",
             os.getenv("PYTHONPATH", "")
         )
