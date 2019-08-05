@@ -295,9 +295,12 @@ class PypackagesInstallCommand(PypackagesProjectCommand):
                         (self._get_pypackages_lib_path() + os.sep)
                         .replace("\\", "\\\\")
                     )
-                    log("{} already exists. Upgrade to replace it.".format(
-                        re.search(pattern, line).group(1)
-                    ))
+                    try:
+                        log("{} already exists. Upgrade to replace it.".format(
+                            re.search(pattern, line).group(1)
+                        ))
+                    except:
+                        continue
         elif stdout:
             for line in stdout.decode().split(os.linesep):
                 if "Successfully" in line:
